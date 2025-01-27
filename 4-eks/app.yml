@@ -40,7 +40,7 @@ metadata:
   name: myapp
   namespace: apps
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::084828584092:role/terraform-myapp-secrets
+    eks.amazonaws.com/role-arn: arn:aws:iam::XXXXXXXXXXXX:role/terraform-myapp-secrets
 
 ---
 
