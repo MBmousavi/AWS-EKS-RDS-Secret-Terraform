@@ -1,0 +1,89 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+
+---
+
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: myapp-aws-secrets
+  namespace: apps
+spec:
+  provider: aws
+  parameters:
+    region: eu-central-1
+    objects: |
+      - objectName: MyDB-db-credentials
+        objectType: secretsmanager
+        jmesPath:
+            - path: username
+              objectAlias: username
+            - path: password
+              objectAlias: password
+  secretObjects:
+    - secretName: myapp-k8s-secret
+      type: Opaque
+      data:
+        - objectName: username
+          key: username
+        - objectName: password
+          key: password
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp
+  namespace: apps
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084828584092:role/terraform-myapp-secrets
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      serviceAccountName: myapp
+      containers:
+        - name: myapp
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+          env:
+            - name: MY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: myapp-k8s-secret
+                  key: username
+            - name: MY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: myapp-k8s-secret
+                  key: password
+      volumes:
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: myapp-aws-secrets
